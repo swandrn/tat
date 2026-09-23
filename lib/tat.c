@@ -399,6 +399,7 @@ bool tat_expect_string(tat_session *session, const char *s, int timeout_ms) {
     timeout_ms -= step_ms;
   }
 }
+
 int tat_send_key(tat_session *session, tat_key key) {
   if (session == NULL || !session->running || session->master_fd < 0) {
     errno = EINVAL;
