@@ -4,7 +4,7 @@
 #include <unistd.h>
 
 int main(void) {
-  tat_session *session = tat_session_create(false);
+  tat_session *session = tat_session_create("ghostty", "ghostty", false);
   if (!session) {
     exit(1);
   }

@@ -28,6 +28,9 @@ struct tat_session {
   pid_t child_pid;
   pid_t viewer_pid;
 
+  char viewer_terminal_path[256];
+  char viewer_terminal_name[32];
+
   pthread_t master_reader_thread;
   pthread_mutex_t vterm_lock;
 
@@ -42,12 +45,43 @@ static void tat__close(int fd) {
   errno = saved_errno;
 }
 
-tat_session *tat_session_create(bool headless) {
+tat_session *tat_session_create(const char *viewer_terminal_path,
+                                const char *viewer_terminal_name,
+                                bool headless) {
+  if ((!viewer_terminal_path || !viewer_terminal_name) && !headless)
+    return NULL;
+
+  if ((viewer_terminal_path[0] == '\0' || viewer_terminal_name[0] == '\0') &&
+      !headless)
+    return NULL;
+
   tat_session *session = malloc(sizeof(tat_session));
+  if (!session)
+    return NULL;
+
+  int written = snprintf(session->viewer_terminal_path,
+                         sizeof(session->viewer_terminal_path), "%s",
+                         viewer_terminal_path);
+  if (written < 0 || (size_t)written >= sizeof(session->viewer_terminal_path)) {
+    TAT_ERROR("viewer_terminal_path was likely truncated");
+    free(session);
+    return NULL;
+  }
+
+  written = snprintf(session->viewer_terminal_name,
+                     sizeof(session->viewer_terminal_name), "%s",
+                     viewer_terminal_name);
+  if (written < 0 || (size_t)written >= sizeof(session->viewer_terminal_name)) {
+    TAT_ERROR("viewer_terminal_name was likely truncated");
+    free(session);
+    return NULL;
+  }
 
   session->vterm = vterm_new(46, 191);
-  if (!session->vterm)
+  if (!session->vterm) {
+    free(session);
     return NULL;
+  }
 
   vterm_set_utf8(session->vterm, 1);
 
@@ -69,7 +103,7 @@ tat_session *tat_session_create(bool headless) {
 }
 
 // create a fifo file to display a mirror of the program in a different terminal
-static int tat__start_viewer() {
+static int tat__start_viewer(tat_session *session) {
   char fifo[128];
 
   snprintf(fifo, sizeof(fifo), "/tmp/tat-%d.fifo", getpid());
@@ -80,10 +114,12 @@ static int tat__start_viewer() {
     return -1;
 
   if (fork() == 0) {
-    execlp("ghostty", "ghostty", "-e", "cat", fifo, (char *)NULL);
+    execlp(session->viewer_terminal_path, session->viewer_terminal_name, "-e",
+           "cat", fifo, (char *)NULL);
     _exit(127);
   }
 
+  // TODO: Use a pipe to prevent open from hanging if execlp fails
   int display_fd = open(fifo, O_WRONLY);
   if (display_fd < 0)
     return -1;
@@ -171,7 +207,7 @@ int tat_start_program(tat_session *session, const char *program_path,
 
   int display_fd = -1;
   if (!session->headless) {
-    if ((display_fd = tat__start_viewer()) < 0)
+    if ((display_fd = tat__start_viewer(session)) < 0)
       return -1;
   }
 

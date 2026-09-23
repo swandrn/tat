@@ -3,6 +3,16 @@
 #include <pthread.h>
 #include <stdbool.h>
 
+#ifdef TAT_ENABLE_DEBUG
+#define TAT_ERROR(...)                                                         \
+  do {                                                                         \
+    fprintf(stderr, __VA_ARGS__);                                              \
+    fputc('\n', stderr);                                                       \
+  } while (0)
+#else
+#define TAT_ERROR(...) ((void)0)
+#endif
+
 typedef enum {
   TAT_KEY_BACKSPACE = 8,
   TAT_KEY_TAB = 9,
@@ -51,7 +61,9 @@ typedef enum {
 
 typedef struct tat_session tat_session;
 
-tat_session *tat_session_create(bool headless);
+tat_session *tat_session_create(const char *viewer_terminal_path,
+                                const char *viewer_terminal_name,
+                                bool headless);
 
 int tat_start_program(tat_session *session, const char *program_path,
                       const char *program_name);
