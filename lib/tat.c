@@ -113,13 +113,44 @@ static int tat__start_viewer(tat_session *session) {
   if (mkfifo(fifo, 0600) < 0)
     return -1;
 
-  if (fork() == 0) {
+  int err_pipe[2];
+
+  if (pipe2(err_pipe, O_CLOEXEC) < 0)
+    return -1;
+
+  pid_t viewer_pid = fork();
+
+  if (viewer_pid < 0)
+    return -1;
+
+  if (viewer_pid == 0) {
+    tat__close(err_pipe[0]);
+
     execlp(session->viewer_terminal_path, session->viewer_terminal_name, "-e",
            "cat", fifo, (char *)NULL);
+
+    int err = errno;
+    write(err_pipe[1], &err, sizeof(err));
     _exit(127);
   }
 
-  // TODO: Use a pipe to prevent open from hanging if execlp fails
+  close(err_pipe[1]);
+
+  int viewer_errno;
+  ssize_t br_err_pipe;
+  do {
+    br_err_pipe = read(err_pipe[0], &viewer_errno, sizeof(viewer_errno));
+  } while (br_err_pipe < 0 && errno == EINTR);
+
+  tat__close(err_pipe[0]);
+
+  if (br_err_pipe == sizeof(viewer_errno)) {
+    errno = viewer_errno;
+    return -1;
+  }
+
+  session->viewer_pid = viewer_pid;
+
   int display_fd = open(fifo, O_WRONLY);
   if (display_fd < 0)
     return -1;
