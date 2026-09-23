@@ -22,6 +22,9 @@ struct tat_session {
   VTerm *vterm;
   VTermScreen *vterm_screen;
 
+  int rows;
+  int cols;
+
   int master_fd;
   int viewer_fd;
 
@@ -45,14 +48,20 @@ static void tat__close(int fd) {
   errno = saved_errno;
 }
 
-tat_session *tat_session_create(const char *viewer_terminal_path,
-                                const char *viewer_terminal_name,
-                                bool headless) {
-  if ((!viewer_terminal_path || !viewer_terminal_name) && !headless)
-    return NULL;
+tat_session *tat_session_create(tat_config *config) {
+  tat_config default_config = {
+      .headless = true,
+      .viewer_terminal_path = "",
+      .viewer_terminal_name = "",
+      .cols = 100,
+      .rows = 40,
+  };
 
-  if ((viewer_terminal_path[0] == '\0' || viewer_terminal_name[0] == '\0') &&
-      !headless)
+  if (!config)
+    config = &default_config;
+
+  if (!config->headless && (config->viewer_terminal_path[0] == '\0' ||
+                            config->viewer_terminal_name[0] == '\0'))
     return NULL;
 
   tat_session *session = malloc(sizeof(tat_session));
@@ -61,7 +70,7 @@ tat_session *tat_session_create(const char *viewer_terminal_path,
 
   int written = snprintf(session->viewer_terminal_path,
                          sizeof(session->viewer_terminal_path), "%s",
-                         viewer_terminal_path);
+                         config->viewer_terminal_path);
   if (written < 0 || (size_t)written >= sizeof(session->viewer_terminal_path)) {
     TAT_ERROR("viewer_terminal_path was likely truncated");
     free(session);
@@ -70,7 +79,7 @@ tat_session *tat_session_create(const char *viewer_terminal_path,
 
   written = snprintf(session->viewer_terminal_name,
                      sizeof(session->viewer_terminal_name), "%s",
-                     viewer_terminal_name);
+                     config->viewer_terminal_name);
   if (written < 0 || (size_t)written >= sizeof(session->viewer_terminal_name)) {
     TAT_ERROR("viewer_terminal_name was likely truncated");
     free(session);
@@ -95,7 +104,7 @@ tat_session *tat_session_create(const char *viewer_terminal_path,
   session->viewer_fd = -1;
   session->child_pid = -1;
 
-  session->headless = headless;
+  session->headless = config->headless;
 
   session->running = 0;
 
@@ -126,6 +135,17 @@ static int tat__start_viewer(tat_session *session) {
   if (viewer_pid == 0) {
     tat__close(err_pipe[0]);
 
+    int devnull = open("/dev/null", O_RDWR);
+
+    if (devnull >= 0) {
+      dup2(devnull, STDIN_FILENO);
+      dup2(devnull, STDOUT_FILENO);
+      dup2(devnull, STDERR_FILENO);
+
+      if (devnull > STDERR_FILENO)
+        tat__close(devnull);
+    }
+
     execlp(session->viewer_terminal_path, session->viewer_terminal_name, "-e",
            "cat", fifo, (char *)NULL);
 
@@ -134,7 +154,7 @@ static int tat__start_viewer(tat_session *session) {
     _exit(127);
   }
 
-  close(err_pipe[1]);
+  tat__close(err_pipe[1]);
 
   int viewer_errno;
   ssize_t br_err_pipe;
@@ -263,36 +283,58 @@ int tat_start_program(tat_session *session, const char *program_path,
     return -1;
   }
 
-  struct winsize slave_ws = {0};
-  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &slave_ws) < 0)
-    _exit(127);
+  struct winsize slave_ws = {
+      .ws_row = session->rows,
+      .ws_col = session->cols,
+  };
 
-  pid_t child_pid = fork();
-  if (child_pid < 0) {
+  int err_pipe[2];
+
+  if (pipe2(err_pipe, O_CLOEXEC) < 0)
+    return -1;
+
+  pid_t program_pid = fork();
+  if (program_pid < 0) {
     tat__close(master_fd);
     return -1;
   }
 
-  if (child_pid == 0) {
+  if (program_pid == 0) {
     tat__close(display_fd);
 
-    if (setsid() < 0)
+    int err;
+
+    if (setsid() < 0) {
+      err = errno;
+      write(err_pipe[1], &err, sizeof(err));
       _exit(127);
+    }
 
     tat__close(master_fd);
 
     int slave_fd = open(slave_name, O_RDWR);
-    if (slave_fd < 0)
+    if (slave_fd < 0) {
+      err = errno;
+      write(err_pipe[1], &err, sizeof(err));
       _exit(127);
+    }
 
-    if (ioctl(slave_fd, TIOCSCTTY, 0) < 0)
+    if (ioctl(slave_fd, TIOCSCTTY, 0) < 0) {
+      err = errno;
+      write(err_pipe[1], &err, sizeof(err));
       _exit(127);
+    }
 
-    if (ioctl(slave_fd, TIOCSWINSZ, &slave_ws) < 0)
+    if (ioctl(slave_fd, TIOCSWINSZ, &slave_ws) < 0) {
+      err = errno;
+      write(err_pipe[1], &err, sizeof(err));
       _exit(127);
+    }
 
     if (dup2(slave_fd, STDIN_FILENO) < 0 || dup2(slave_fd, STDOUT_FILENO) < 0 ||
         dup2(slave_fd, STDERR_FILENO) < 0) {
+      err = errno;
+      write(err_pipe[1], &err, sizeof(err));
       _exit(127);
     }
 
@@ -301,7 +343,24 @@ int tat_start_program(tat_session *session, const char *program_path,
 
     execl(program_path, program_name, (char *)NULL);
 
+    err = errno;
+    write(err_pipe[1], &err, sizeof(err));
     _exit(127);
+  }
+
+  tat__close(err_pipe[1]);
+
+  int program_errno;
+  ssize_t br_err_pipe;
+  do {
+    br_err_pipe = read(err_pipe[0], &program_errno, sizeof(program_errno));
+  } while (br_err_pipe < 0 && errno == EINTR);
+
+  tat__close(err_pipe[0]);
+
+  if (br_err_pipe == sizeof(program_errno)) {
+    errno = program_errno;
+    return -1;
   }
 
   int flags = fcntl(master_fd, F_GETFL);
@@ -311,8 +370,7 @@ int tat_start_program(tat_session *session, const char *program_path,
 
   session->master_fd = master_fd;
   session->viewer_fd = display_fd;
-  session->child_pid = child_pid;
-  session->running = true;
+  session->child_pid = program_pid;
 
   int err = pthread_create(&session->master_reader_thread, NULL,
                            tat__master_reader, session);
@@ -320,6 +378,8 @@ int tat_start_program(tat_session *session, const char *program_path,
     errno = err;
     return -1;
   }
+
+  session->running = true;
 
   return 0;
 }
@@ -330,13 +390,7 @@ void tat_session_destroy(tat_session *session) {
 
   session->running = false;
 
-  vterm_free(session->vterm);
-
-  tat__close(session->viewer_fd);
-  tat__close(session->master_fd);
-
-  session->viewer_fd = -1;
-  session->master_fd = -1;
+  pthread_join(session->master_reader_thread, NULL);
 
   if (session->child_pid > 0) {
     kill(session->child_pid, SIGKILL);
@@ -348,8 +402,12 @@ void tat_session_destroy(tat_session *session) {
     waitpid(session->viewer_pid, NULL, 0);
   }
 
+  tat__close(session->viewer_fd);
+  tat__close(session->master_fd);
+
+  vterm_free(session->vterm);
+
   free(session);
-  session = NULL;
 }
 
 // Find a string in the terminal. Returns `true` if found within `timeout_ms`

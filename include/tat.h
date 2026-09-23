@@ -61,9 +61,17 @@ typedef enum {
 
 typedef struct tat_session tat_session;
 
-tat_session *tat_session_create(const char *viewer_terminal_path,
-                                const char *viewer_terminal_name,
-                                bool headless);
+typedef struct {
+  bool headless;
+
+  char viewer_terminal_path[256];
+  char viewer_terminal_name[32];
+
+  int rows;
+  int cols;
+} tat_config;
+
+tat_session *tat_session_create(tat_config *config);
 
 int tat_start_program(tat_session *session, const char *program_path,
                       const char *program_name);

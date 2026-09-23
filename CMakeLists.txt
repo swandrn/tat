@@ -4,7 +4,7 @@ project(tat C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(tat
+add_library(tat STATIC
 	lib/tat.c
 
 	vendor/vterm/src/encoding.c
@@ -18,7 +18,7 @@ add_library(tat
 	vendor/vterm/src/vterm.c
 )
 
-target_include_directories(tat 
+target_include_directories(tat
 	PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR}/include
 
@@ -26,3 +26,9 @@ target_include_directories(tat
 		${CMAKE_CURRENT_SOURCE_DIR}/vendor/vterm/include
 		${CMAKE_CURRENT_SOURCE_DIR}/vendor/vterm/src
 )
+
+include(CTest)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
