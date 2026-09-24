@@ -18,6 +18,14 @@
 #include <termios.h>
 #include <unistd.h>
 
+#ifdef __cplusplus
+#include <atomic>
+using namespace std;
+#define _Atomic(T) atomic<T>
+#else
+#include <stdatomic.h>
+#endif
+
 struct tat_session {
   VTerm *vterm;
   VTermScreen *vterm_screen;
@@ -38,7 +46,7 @@ struct tat_session {
   pthread_mutex_t vterm_lock;
 
   bool headless;
-  bool running;
+  _Atomic(bool) running;
 };
 
 // close without overwriting `errno`
@@ -64,7 +72,7 @@ tat_session *tat_session_create(tat_config *config) {
                             config->viewer_terminal_name[0] == '\0'))
     return NULL;
 
-  tat_session *session = malloc(sizeof(tat_session));
+  tat_session *session = calloc(1, sizeof(tat_session));
   if (!session)
     return NULL;
 
@@ -86,7 +94,10 @@ tat_session *tat_session_create(tat_config *config) {
     return NULL;
   }
 
-  session->vterm = vterm_new(46, 191);
+  session->rows = config->rows;
+  session->cols = config->cols;
+
+  session->vterm = vterm_new(session->rows, session->cols);
   if (!session->vterm) {
     free(session);
     return NULL;
@@ -104,9 +115,11 @@ tat_session *tat_session_create(tat_config *config) {
   session->viewer_fd = -1;
   session->child_pid = -1;
 
+  pthread_mutex_init(&session->vterm_lock, NULL);
+
   session->headless = config->headless;
 
-  session->running = 0;
+  atomic_init(&session->running, false);
 
   return session;
 }
@@ -183,7 +196,7 @@ static void *tat__master_reader(void *arg) {
 
   char master_buf[4096];
 
-  while (session->running) {
+  while (atomic_load(&session->running)) {
     ssize_t br_master =
         read(session->master_fd, master_buf, sizeof(master_buf));
 
@@ -261,7 +274,8 @@ int tat_start_program(tat_session *session, const char *program_path,
     return -1;
   }
 
-  if (session->running) {
+  if (atomic_load(&session->running)) {
+
     errno = EBUSY;
     return -1;
   }
@@ -382,14 +396,15 @@ int tat_start_program(tat_session *session, const char *program_path,
   session->viewer_fd = display_fd;
   session->child_pid = program_pid;
 
+  atomic_store(&session->running, true);
+
   int err = pthread_create(&session->master_reader_thread, NULL,
                            tat__master_reader, session);
   if (err != 0) {
+    atomic_store(&session->running, false);
     errno = err;
     return -1;
   }
-
-  session->running = true;
 
   return 0;
 }
@@ -398,7 +413,7 @@ void tat_session_destroy(tat_session *session) {
   if (session == NULL)
     return;
 
-  session->running = false;
+  atomic_store(&session->running, false);
 
   pthread_join(session->master_reader_thread, NULL);
 
@@ -469,7 +484,8 @@ bool tat_expect_string(tat_session *session, const char *s, int timeout_ms) {
 }
 
 int tat_send_key(tat_session *session, tat_key key) {
-  if (session == NULL || !session->running || session->master_fd < 0) {
+  if (session == NULL || !atomic_load(&session->running) ||
+      session->master_fd < 0) {
     errno = EINVAL;
     return -1;
   }
