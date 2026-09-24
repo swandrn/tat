@@ -1,5 +1,6 @@
 #include "tat.h"
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -23,6 +24,7 @@ int main(void) {
   tat_session_destroy(session);
 
   assert(tat_send_key(session, TAT_KEY_T) < 0);
+  assert(errno == EINVAL);
 
   return 0;
 }
