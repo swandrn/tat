@@ -474,6 +474,11 @@ int tat_send_key(tat_session *session, tat_key key) {
     return -1;
   }
 
+  if (key < 0 || key > 127) {
+    errno = EINVAL;
+    return -1;
+  }
+
   unsigned char c = (unsigned char)key;
 
   ssize_t bytes_written;
