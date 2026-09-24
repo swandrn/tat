@@ -8,7 +8,7 @@
 int main(void) {
   tat_config config = {
       .headless = false,
-      .viewer_terminal_path = "ghostty",
+      .viewer_terminal_path = "/usr/bin/ghostty",
       .viewer_terminal_name = "ghostty",
       .cols = 100,
       .rows = 40,

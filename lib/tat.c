@@ -146,8 +146,8 @@ static int tat__start_viewer(tat_session *session) {
         tat__close(devnull);
     }
 
-    execlp(session->viewer_terminal_path, session->viewer_terminal_name, "-e",
-           "cat", fifo, (char *)NULL);
+    execl(session->viewer_terminal_path, session->viewer_terminal_name, "-e",
+          "cat", fifo, (char *)NULL);
 
     int err = errno;
     write(err_pipe[1], &err, sizeof(err));
@@ -246,6 +246,9 @@ static void *tat__master_reader(void *arg) {
 
 // Starts the program provided by `program_path` and `program_name`. Returns 0
 // on success and -1 on error with errno set to explain the error.
+// `program_name` (and optionally `viewer_terminal_name`) is executed with
+// execl, so `program_path` (and optionally `viewer_terminal_path`) must be the
+// full path, whether absolute or relative.
 //
 // The program is started by the time this function returns, however it might
 // not be rendering anything. It is recommended to use `tat_expect_string` with
