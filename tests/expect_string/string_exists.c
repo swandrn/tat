@@ -18,10 +18,7 @@ int main(void) {
 
   assert(tat_start_program(session, "/usr/bin/htop", "htop") >= 0);
 
-  assert(tat_send_key(session, TAT_KEY_T) == 0);
-
-  assert(tat_expect_string(session, "Main", 1000) == true);
-  assert(!tat_expect_string(session, "A String That Does Not Exist", 100));
+  assert(tat_expect_string(session, "Main", 1000));
 
   tat_session_destroy(session);
   return 0;

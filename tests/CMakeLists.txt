@@ -1,5 +1,5 @@
-file(GLOB TEST_SOURCES CONFIGURE_DEPENDS
-	"${CMAKE_CURRENT_SOURCE_DIR}/test_*.c"
+file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
+	"${CMAKE_CURRENT_SOURCE_DIR}/*.c"
 )
 
 foreach(TEST_SOURCE ${TEST_SOURCES})
@@ -18,7 +18,7 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
 		COMMAND ${TEST_NAME}
 	)
 
-	set_tests_properties(test_lifecycle PROPERTIES
+	set_tests_properties(${TEST_NAME} PROPERTIES
 		TIMEOUT 5
 	)
 endforeach()

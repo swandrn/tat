@@ -244,6 +244,13 @@ static void *tat__master_reader(void *arg) {
   return NULL;
 }
 
+// Starts the program provided by `program_path` and `program_name`. Returns 0
+// on success and -1 on error with errno set to explain the error.
+//
+// The program is started by the time this function returns, however it might
+// not be rendering anything. It is recommended to use `tat_expect_string` with
+// a suitable timeout to ensure the
+// program is ready for use.
 int tat_start_program(tat_session *session, const char *program_path,
                       const char *program_name) {
   if (session == NULL || program_path == NULL || program_name == NULL) {
