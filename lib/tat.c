@@ -56,72 +56,70 @@ static void tat__close(int fd) {
   errno = saved_errno;
 }
 
-tat_session *tat_session_create(tat_config *config) {
-  tat_config default_config = {
-      .headless = true,
-      .viewer_terminal_path = "",
-      .viewer_terminal_name = "",
-      .cols = 100,
-      .rows = 40,
-  };
+static void *tat__master_reader(void *arg) {
+  tat_session *session = arg;
 
-  if (!config)
-    config = &default_config;
+  char master_buf[4096];
 
-  if (!config->headless && (config->viewer_terminal_path[0] == '\0' ||
-                            config->viewer_terminal_name[0] == '\0'))
-    return NULL;
+  while (atomic_load(&session->running)) {
+    ssize_t br_master =
+        read(session->master_fd, master_buf, sizeof(master_buf));
 
-  tat_session *session = calloc(1, sizeof(tat_session));
-  if (!session)
-    return NULL;
+    if (br_master > 0) {
+      size_t offset;
 
-  int written = snprintf(session->viewer_terminal_path,
-                         sizeof(session->viewer_terminal_path), "%s",
-                         config->viewer_terminal_path);
-  if (written < 0 || (size_t)written >= sizeof(session->viewer_terminal_path)) {
-    TAT_ERROR("viewer_terminal_path was likely truncated");
-    free(session);
-    return NULL;
+      //
+      // write to vterm
+      //
+
+      offset = 0;
+      pthread_mutex_lock(&session->vterm_lock);
+      vterm_input_write(session->vterm, master_buf, br_master);
+      pthread_mutex_unlock(&session->vterm_lock);
+
+      //
+      // write to viewer
+      //
+
+      if (!session->headless) {
+        offset = 0;
+
+        while (offset < (size_t)br_master) {
+          ssize_t bw_display = write(session->viewer_fd, master_buf + offset,
+                                     br_master - offset);
+
+          if (bw_display > 0) {
+            offset += bw_display;
+            continue;
+          }
+
+          if (bw_display < 0 && errno == EINTR)
+            continue;
+
+          if (bw_display < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            usleep(10000);
+            continue;
+          }
+
+          return NULL;
+        }
+      }
+
+      continue;
+    }
+
+    if (br_master < 0) {
+      if (errno == EINTR)
+        continue;
+
+      if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EIO) {
+        usleep(10000);
+        continue;
+      }
+    }
   }
 
-  written = snprintf(session->viewer_terminal_name,
-                     sizeof(session->viewer_terminal_name), "%s",
-                     config->viewer_terminal_name);
-  if (written < 0 || (size_t)written >= sizeof(session->viewer_terminal_name)) {
-    TAT_ERROR("viewer_terminal_name was likely truncated");
-    free(session);
-    return NULL;
-  }
-
-  session->rows = config->rows;
-  session->cols = config->cols;
-
-  session->vterm = vterm_new(session->rows, session->cols);
-  if (!session->vterm) {
-    free(session);
-    return NULL;
-  }
-
-  vterm_set_utf8(session->vterm, 1);
-
-  session->vterm_screen = vterm_obtain_screen(session->vterm);
-
-  vterm_screen_enable_altscreen(session->vterm_screen, 1);
-
-  vterm_screen_reset(session->vterm_screen, 1);
-
-  session->master_fd = -1;
-  session->viewer_fd = -1;
-  session->child_pid = -1;
-
-  pthread_mutex_init(&session->vterm_lock, NULL);
-
-  session->headless = config->headless;
-
-  atomic_init(&session->running, false);
-
-  return session;
+  return NULL;
 }
 
 // create a fifo file to display a mirror of the program in a different terminal
@@ -191,82 +189,100 @@ static int tat__start_viewer(tat_session *session) {
   return display_fd;
 }
 
-static void *tat__master_reader(void *arg) {
-  tat_session *session = arg;
+tat_session *tat_session_create(tat_config *config) {
+  tat_config default_config = {
+      .headless = true,
+      .viewer_terminal_path = "",
+      .viewer_terminal_name = "",
+      .cols = 100,
+      .rows = 40,
+  };
 
-  char master_buf[4096];
+  if (!config)
+    config = &default_config;
 
-  while (atomic_load(&session->running)) {
-    ssize_t br_master =
-        read(session->master_fd, master_buf, sizeof(master_buf));
+  if (!config->headless && (config->viewer_terminal_path[0] == '\0' ||
+                            config->viewer_terminal_name[0] == '\0'))
+    return NULL;
 
-    if (br_master > 0) {
-      size_t offset;
+  tat_session *session = calloc(1, sizeof(tat_session));
+  if (!session)
+    return NULL;
 
-      //
-      // write to vterm
-      //
-
-      offset = 0;
-      pthread_mutex_lock(&session->vterm_lock);
-      vterm_input_write(session->vterm, master_buf, br_master);
-      pthread_mutex_unlock(&session->vterm_lock);
-
-      //
-      // write to viewer
-      //
-
-      if (!session->headless) {
-        offset = 0;
-
-        while (offset < (size_t)br_master) {
-          ssize_t bw_display = write(session->viewer_fd, master_buf + offset,
-                                     br_master - offset);
-
-          if (bw_display > 0) {
-            offset += bw_display;
-            continue;
-          }
-
-          if (bw_display < 0 && errno == EINTR)
-            continue;
-
-          if (bw_display < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            usleep(10000);
-            continue;
-          }
-
-          return NULL;
-        }
-      }
-
-      continue;
-    }
-
-    if (br_master < 0) {
-      if (errno == EINTR)
-        continue;
-
-      if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EIO) {
-        usleep(10000);
-        continue;
-      }
-    }
+  int written = snprintf(session->viewer_terminal_path,
+                         sizeof(session->viewer_terminal_path), "%s",
+                         config->viewer_terminal_path);
+  if (written < 0 || (size_t)written >= sizeof(session->viewer_terminal_path)) {
+    TAT_ERROR("viewer_terminal_path was likely truncated");
+    free(session);
+    return NULL;
   }
 
-  return NULL;
+  written = snprintf(session->viewer_terminal_name,
+                     sizeof(session->viewer_terminal_name), "%s",
+                     config->viewer_terminal_name);
+  if (written < 0 || (size_t)written >= sizeof(session->viewer_terminal_name)) {
+    TAT_ERROR("viewer_terminal_name was likely truncated");
+    free(session);
+    return NULL;
+  }
+
+  session->rows = config->rows;
+  session->cols = config->cols;
+
+  session->vterm = vterm_new(session->rows, session->cols);
+  if (!session->vterm) {
+    free(session);
+    return NULL;
+  }
+
+  vterm_set_utf8(session->vterm, 1);
+
+  session->vterm_screen = vterm_obtain_screen(session->vterm);
+
+  vterm_screen_enable_altscreen(session->vterm_screen, 1);
+
+  vterm_screen_reset(session->vterm_screen, 1);
+
+  session->master_fd = -1;
+  session->viewer_fd = -1;
+  session->child_pid = -1;
+
+  pthread_mutex_init(&session->vterm_lock, NULL);
+
+  session->headless = config->headless;
+
+  atomic_init(&session->running, false);
+
+  return session;
 }
 
-// Starts the program provided by `program_path` and `program_name`. Returns 0
-// on success and -1 on error with errno set to explain the error.
-// `program_name` (and optionally `viewer_terminal_name`) is executed with
-// execl, so `program_path` (and optionally `viewer_terminal_path`) must be the
-// full path, whether absolute or relative.
-//
-// The program is started by the time this function returns, however it might
-// not be rendering anything. It is recommended to use `tat_expect_string` with
-// a suitable timeout to ensure the
-// program is ready for use.
+void tat_session_destroy(tat_session *session) {
+  if (session == NULL)
+    return;
+
+  atomic_store(&session->running, false);
+
+  pthread_join(session->master_reader_thread, NULL);
+
+  if (session->child_pid > 0) {
+    kill(session->child_pid, SIGKILL);
+    waitpid(session->child_pid, NULL, 0);
+  }
+
+  if (session->viewer_pid > 0) {
+    kill(session->viewer_pid, SIGKILL);
+    waitpid(session->viewer_pid, NULL, 0);
+  }
+
+  tat__close(session->viewer_fd);
+  tat__close(session->master_fd);
+
+  vterm_free(session->vterm);
+
+  free(session);
+}
+
 int tat_start_program(tat_session *session, const char *program_path,
                       const char *program_name) {
   if (session == NULL || program_path == NULL || program_name == NULL) {
@@ -409,34 +425,32 @@ int tat_start_program(tat_session *session, const char *program_path,
   return 0;
 }
 
-void tat_session_destroy(tat_session *session) {
-  if (session == NULL)
-    return;
-
-  atomic_store(&session->running, false);
-
-  pthread_join(session->master_reader_thread, NULL);
-
-  if (session->child_pid > 0) {
-    kill(session->child_pid, SIGKILL);
-    waitpid(session->child_pid, NULL, 0);
+int tat_send_key(tat_session *session, tat_key key) {
+  if (session == NULL || !atomic_load(&session->running) ||
+      session->master_fd < 0) {
+    errno = EINVAL;
+    return -1;
   }
 
-  if (session->viewer_pid > 0) {
-    kill(session->viewer_pid, SIGKILL);
-    waitpid(session->viewer_pid, NULL, 0);
+  if (key < 0 || key > 127) {
+    errno = EINVAL;
+    return -1;
   }
 
-  tat__close(session->viewer_fd);
-  tat__close(session->master_fd);
+  unsigned char c = (unsigned char)key;
 
-  vterm_free(session->vterm);
+  ssize_t bytes_written;
 
-  free(session);
+  do {
+    bytes_written = write(session->master_fd, &c, 1);
+  } while (bytes_written < 0 && errno == EINTR);
+
+  if (bytes_written != 1)
+    return -1;
+
+  return 0;
 }
 
-// Find a string in the terminal. Returns `true` if found within `timeout_ms`
-// else `false`
 bool tat_expect_string(tat_session *session, const char *s, int timeout_ms) {
   for (;;) {
     int rows, cols;
@@ -481,30 +495,4 @@ bool tat_expect_string(tat_session *session, const char *s, int timeout_ms) {
     usleep((useconds_t)step_ms * 1000);
     timeout_ms -= step_ms;
   }
-}
-
-int tat_send_key(tat_session *session, tat_key key) {
-  if (session == NULL || !atomic_load(&session->running) ||
-      session->master_fd < 0) {
-    errno = EINVAL;
-    return -1;
-  }
-
-  if (key < 0 || key > 127) {
-    errno = EINVAL;
-    return -1;
-  }
-
-  unsigned char c = (unsigned char)key;
-
-  ssize_t bytes_written;
-
-  do {
-    bytes_written = write(session->master_fd, &c, 1);
-  } while (bytes_written < 0 && errno == EINTR);
-
-  if (bytes_written != 1)
-    return -1;
-
-  return 0;
 }
