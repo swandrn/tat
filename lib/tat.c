@@ -43,17 +43,69 @@ struct tat_session {
   char viewer_terminal_name[32];
 
   pthread_t master_reader_thread;
+  pthread_mutex_t master_write_lock;
   pthread_mutex_t vterm_lock;
 
   bool headless;
   _Atomic(bool) running;
 };
 
-// close without overwriting `errno`
+// Close without overwriting `errno`
 static void tat__close(int fd) {
   int saved_errno = errno;
   close(fd);
   errno = saved_errno;
+}
+
+// Thread safe write to master fd
+static int tat__write_master(tat_session *session, const char *buf,
+                             size_t len) {
+  pthread_mutex_lock(&session->master_write_lock);
+
+  size_t offset = 0;
+
+  while (offset < len) {
+    ssize_t n = write(session->master_fd, buf + offset, len - offset);
+
+    if (n > 0) {
+      offset += (size_t)n;
+      continue;
+    }
+
+    if (n < 0 && errno == EINTR)
+      continue;
+
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+
+      struct pollfd pfd = {
+          .fd = session->master_fd,
+          .events = POLLOUT,
+      };
+
+      int r;
+      do {
+        r = poll(&pfd, 1, 1000);
+      } while (r < 0 && errno == EINTR);
+
+      if (r > 0)
+        continue;
+    }
+
+    pthread_mutex_unlock(&session->master_write_lock);
+    return -1;
+  }
+
+  pthread_mutex_unlock(&session->master_write_lock);
+  return 0;
+}
+
+static void tat__vterm_output(const char *s, size_t len, void *user) {
+  tat_session *session = user;
+
+  if (session->master_fd < 0)
+    return;
+
+  tat__write_master(session, s, len);
 }
 
 static void *tat__master_reader(void *arg) {
@@ -237,6 +289,8 @@ tat_session *tat_session_create(tat_config *config) {
   }
 
   vterm_set_utf8(session->vterm, 1);
+
+  vterm_output_set_callback(session->vterm, tat__vterm_output, session);
 
   session->vterm_screen = vterm_obtain_screen(session->vterm);
 
@@ -439,16 +493,7 @@ int tat_send_key(tat_session *session, tat_key key) {
 
   unsigned char c = (unsigned char)key;
 
-  ssize_t bytes_written;
-
-  do {
-    bytes_written = write(session->master_fd, &c, 1);
-  } while (bytes_written < 0 && errno == EINTR);
-
-  if (bytes_written != 1)
-    return -1;
-
-  return 0;
+  return tat__write_master(session, (const char *)&c, 1);
 }
 
 bool tat_expect_string(tat_session *session, const char *s, int timeout_ms) {
