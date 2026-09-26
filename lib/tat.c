@@ -337,6 +337,7 @@ void tat_session_destroy(tat_session *session) {
   free(session);
 }
 
+// TODO: Support passing args or flags to program
 int tat_start_program(tat_session *session, const char *program_path,
                       const char *program_name) {
   if (session == NULL || program_path == NULL || program_name == NULL) {
