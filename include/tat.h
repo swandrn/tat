@@ -14,9 +14,9 @@
 #endif
 
 typedef enum {
-  TAT_KEY_BACKSPACE = 8,
-  TAT_KEY_TAB = 9,
-  TAT_KEY_ENTER = 10,
+  TAT_KEY_BACKSPACE = 127,
+  TAT_KEY_TAB = '\t',
+  TAT_KEY_ENTER = '\r',
 
   TAT_KEY_SPACE = 32,
 
@@ -57,6 +57,33 @@ typedef enum {
   TAT_KEY_X = 'x',
   TAT_KEY_Y = 'y',
   TAT_KEY_Z = 'z',
+
+  TAT_KEY_UPPER_A = 'A',
+  TAT_KEY_UPPER_B = 'B',
+  TAT_KEY_UPPER_C = 'C',
+  TAT_KEY_UPPER_D = 'D',
+  TAT_KEY_UPPER_E = 'E',
+  TAT_KEY_UPPER_F = 'F',
+  TAT_KEY_UPPER_G = 'G',
+  TAT_KEY_UPPER_H = 'H',
+  TAT_KEY_UPPER_I = 'I',
+  TAT_KEY_UPPER_J = 'J',
+  TAT_KEY_UPPER_K = 'K',
+  TAT_KEY_UPPER_L = 'L',
+  TAT_KEY_UPPER_M = 'M',
+  TAT_KEY_UPPER_N = 'N',
+  TAT_KEY_UPPER_O = 'O',
+  TAT_KEY_UPPER_P = 'P',
+  TAT_KEY_UPPER_Q = 'Q',
+  TAT_KEY_UPPER_R = 'R',
+  TAT_KEY_UPPER_S = 'S',
+  TAT_KEY_UPPER_T = 'T',
+  TAT_KEY_UPPER_U = 'U',
+  TAT_KEY_UPPER_V = 'V',
+  TAT_KEY_UPPER_W = 'W',
+  TAT_KEY_UPPER_X = 'X',
+  TAT_KEY_UPPER_Y = 'Y',
+  TAT_KEY_UPPER_Z = 'Z',
 } tat_key;
 
 typedef struct tat_session tat_session;
