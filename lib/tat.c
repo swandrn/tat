@@ -511,18 +511,19 @@ bool tat_expect_string(tat_session *session, const char *s, int timeout_ms) {
         .end_col = cols,
     };
 
-    size_t len = vterm_screen_get_text(session->vterm_screen, NULL, 0, rect);
+    size_t preparsed_screen_size =
+        vterm_screen_get_text(session->vterm_screen, NULL, 0, rect);
 
-    char *expected_string_buf = malloc(len + 1);
+    char *expected_string_buf = malloc(preparsed_screen_size + 1);
 
     if (expected_string_buf == NULL) {
       pthread_mutex_unlock(&session->vterm_lock);
       return false;
     }
 
-    vterm_screen_get_text(session->vterm_screen, expected_string_buf, len,
-                          rect);
-    expected_string_buf[len] = '\0';
+    vterm_screen_get_text(session->vterm_screen, expected_string_buf,
+                          preparsed_screen_size, rect);
+    expected_string_buf[preparsed_screen_size] = '\0';
 
     pthread_mutex_unlock(&session->vterm_lock);
 
