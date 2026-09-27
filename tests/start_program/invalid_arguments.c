@@ -17,15 +17,15 @@ int main(void) {
   tat_session *session = tat_session_create(&config);
   assert(session != NULL);
 
-  assert(tat_start_program(NULL, "/usr/bin/htop", "htop") < 0);
+  assert(tat_start_program(NULL, "/usr/bin/top", "top") < 0);
   assert(errno == EINVAL);
   errno = 0;
 
-  assert(tat_start_program(session, NULL, "htop") < 0);
+  assert(tat_start_program(session, NULL, "top") < 0);
   assert(errno == EINVAL);
   errno = 0;
 
-  assert(tat_start_program(session, "/usr/bin/htop", NULL) < 0);
+  assert(tat_start_program(session, "/usr/bin/top", NULL) < 0);
   assert(errno == EINVAL);
 
   tat_session_destroy(session);

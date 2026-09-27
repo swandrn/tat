@@ -17,9 +17,9 @@ int main(void) {
   tat_session *session = tat_session_create(&config);
   assert(session != NULL);
 
-  assert(tat_start_program(session, "/usr/bin/htop", "htop") == 0);
+  assert(tat_start_program(session, "/usr/bin/top", "top") == 0);
 
-  assert(tat_start_program(session, "/usr/bin/htop", "htop") < 0);
+  assert(tat_start_program(session, "/usr/bin/top", "top") < 0);
   assert(errno == EBUSY);
 
   tat_session_destroy(session);

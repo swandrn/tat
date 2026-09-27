@@ -16,7 +16,7 @@ int main(void) {
   tat_session *session = tat_session_create(&config);
   assert(session != NULL);
 
-  assert(tat_start_program(session, "/usr/bin/htop", "htop") == 0);
+  assert(tat_start_program(session, "/usr/bin/top", "top") == 0);
 
   assert(!tat_expect_string(session, "A String That Does Not Exist", 1000));
 
