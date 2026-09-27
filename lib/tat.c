@@ -480,7 +480,7 @@ int tat_start_program(tat_session *session, const char *program_path,
   return 0;
 }
 
-int tat_send_key(tat_session *session, tat_key key) {
+int tat_send_key(tat_session *session, unsigned char key) {
   if (session == NULL || !atomic_load(&session->running) ||
       session->master_fd < 0) {
     errno = EINVAL;

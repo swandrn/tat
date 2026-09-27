@@ -13,78 +13,10 @@
 #define TAT_ERROR(...) ((void)0)
 #endif
 
-typedef enum {
-  TAT_KEY_BACKSPACE = 127,
-  TAT_KEY_TAB = '\t',
-  TAT_KEY_ENTER = '\r',
-
-  TAT_KEY_SPACE = 32,
-
-  TAT_KEY_0 = '0',
-  TAT_KEY_1 = '1',
-  TAT_KEY_2 = '2',
-  TAT_KEY_3 = '3',
-  TAT_KEY_4 = '4',
-  TAT_KEY_5 = '5',
-  TAT_KEY_6 = '6',
-  TAT_KEY_7 = '7',
-  TAT_KEY_8 = '8',
-  TAT_KEY_9 = '9',
-
-  TAT_KEY_A = 'a',
-  TAT_KEY_B = 'b',
-  TAT_KEY_C = 'c',
-  TAT_KEY_D = 'd',
-  TAT_KEY_E = 'e',
-  TAT_KEY_F = 'f',
-  TAT_KEY_G = 'g',
-  TAT_KEY_H = 'h',
-  TAT_KEY_I = 'i',
-  TAT_KEY_J = 'j',
-  TAT_KEY_K = 'k',
-  TAT_KEY_L = 'l',
-  TAT_KEY_M = 'm',
-  TAT_KEY_N = 'n',
-  TAT_KEY_O = 'o',
-  TAT_KEY_P = 'p',
-  TAT_KEY_Q = 'q',
-  TAT_KEY_R = 'r',
-  TAT_KEY_S = 's',
-  TAT_KEY_T = 't',
-  TAT_KEY_U = 'u',
-  TAT_KEY_V = 'v',
-  TAT_KEY_W = 'w',
-  TAT_KEY_X = 'x',
-  TAT_KEY_Y = 'y',
-  TAT_KEY_Z = 'z',
-
-  TAT_KEY_UPPER_A = 'A',
-  TAT_KEY_UPPER_B = 'B',
-  TAT_KEY_UPPER_C = 'C',
-  TAT_KEY_UPPER_D = 'D',
-  TAT_KEY_UPPER_E = 'E',
-  TAT_KEY_UPPER_F = 'F',
-  TAT_KEY_UPPER_G = 'G',
-  TAT_KEY_UPPER_H = 'H',
-  TAT_KEY_UPPER_I = 'I',
-  TAT_KEY_UPPER_J = 'J',
-  TAT_KEY_UPPER_K = 'K',
-  TAT_KEY_UPPER_L = 'L',
-  TAT_KEY_UPPER_M = 'M',
-  TAT_KEY_UPPER_N = 'N',
-  TAT_KEY_UPPER_O = 'O',
-  TAT_KEY_UPPER_P = 'P',
-  TAT_KEY_UPPER_Q = 'Q',
-  TAT_KEY_UPPER_R = 'R',
-  TAT_KEY_UPPER_S = 'S',
-  TAT_KEY_UPPER_T = 'T',
-  TAT_KEY_UPPER_U = 'U',
-  TAT_KEY_UPPER_V = 'V',
-  TAT_KEY_UPPER_W = 'W',
-  TAT_KEY_UPPER_X = 'X',
-  TAT_KEY_UPPER_Y = 'Y',
-  TAT_KEY_UPPER_Z = 'Z',
-} tat_key;
+#define TAT_KEY_BACKSPACE 127
+#define TAT_KEY_TAB '\t'
+#define TAT_KEY_ENTER '\r'
+#define TAT_KEY_SPACE 32
 
 typedef struct tat_session tat_session;
 
@@ -115,7 +47,7 @@ void tat_session_destroy(tat_session *session);
 int tat_start_program(tat_session *session, const char *program_path,
                       const char *program_name);
 
-int tat_send_key(tat_session *session, tat_key key);
+int tat_send_key(tat_session *session, unsigned char key);
 
 // Find a string in the terminal. Returns true if found within `timeout_ms`
 // else false

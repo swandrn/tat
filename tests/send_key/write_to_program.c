@@ -20,22 +20,22 @@ int main(void) {
 
   assert(tat_expect_string(session, "VIM", 1000));
 
-  assert(tat_send_key(session, TAT_KEY_A) == 0);
+  assert(tat_send_key(session, 'a') == 0);
 
-  assert(tat_send_key(session, TAT_KEY_UPPER_H) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_E) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_L) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_L) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_O) == 0);
+  assert(tat_send_key(session, 'H') == 0);
+  assert(tat_send_key(session, 'E') == 0);
+  assert(tat_send_key(session, 'L') == 0);
+  assert(tat_send_key(session, 'L') == 0);
+  assert(tat_send_key(session, 'O') == 0);
   assert(tat_send_key(session, TAT_KEY_SPACE) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_F) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_R) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_O) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_M) == 0);
+  assert(tat_send_key(session, 'F') == 0);
+  assert(tat_send_key(session, 'R') == 0);
+  assert(tat_send_key(session, 'O') == 0);
+  assert(tat_send_key(session, 'M') == 0);
   assert(tat_send_key(session, TAT_KEY_SPACE) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_T) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_A) == 0);
-  assert(tat_send_key(session, TAT_KEY_UPPER_T) == 0);
+  assert(tat_send_key(session, 'T') == 0);
+  assert(tat_send_key(session, 'A') == 0);
+  assert(tat_send_key(session, 'T') == 0);
 
   assert(tat_expect_string(session, "HELLO FROM TAT", 100));
 

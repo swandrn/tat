@@ -19,11 +19,11 @@ int main(void) {
 
   assert(tat_start_program(session, "/usr/bin/htop", "htop") == 0);
 
-  assert(tat_send_key(session, TAT_KEY_T) == 0);
+  assert(tat_send_key(session, 't') == 0);
 
   tat_session_destroy(session);
 
-  assert(tat_send_key(session, TAT_KEY_T) < 0);
+  assert(tat_send_key(session, 't') < 0);
   assert(errno == EINVAL);
 
   return 0;
