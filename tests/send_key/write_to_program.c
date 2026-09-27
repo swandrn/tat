@@ -22,20 +22,7 @@ int main(void) {
 
   assert(tat_send_key(session, 'a') == 0);
 
-  assert(tat_send_key(session, 'H') == 0);
-  assert(tat_send_key(session, 'E') == 0);
-  assert(tat_send_key(session, 'L') == 0);
-  assert(tat_send_key(session, 'L') == 0);
-  assert(tat_send_key(session, 'O') == 0);
-  assert(tat_send_key(session, TAT_KEY_SPACE) == 0);
-  assert(tat_send_key(session, 'F') == 0);
-  assert(tat_send_key(session, 'R') == 0);
-  assert(tat_send_key(session, 'O') == 0);
-  assert(tat_send_key(session, 'M') == 0);
-  assert(tat_send_key(session, TAT_KEY_SPACE) == 0);
-  assert(tat_send_key(session, 'T') == 0);
-  assert(tat_send_key(session, 'A') == 0);
-  assert(tat_send_key(session, 'T') == 0);
+  assert(tat_send_string(session, "HELLO FROM TAT") == 0);
 
   assert(tat_expect_string(session, "HELLO FROM TAT", 100));
 

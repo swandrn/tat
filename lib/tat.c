@@ -497,6 +497,25 @@ int tat_send_key(tat_session *session, unsigned char key) {
   return tat__write_master(session, (const char *)&c, 1);
 }
 
+int tat_send_string(tat_session *session, const char *s) {
+  if (session == NULL || s == NULL || !atomic_load(&session->running) ||
+      session->master_fd < 0) {
+    errno = EINVAL;
+    return -1;
+  }
+
+  size_t s_len = strlen(s);
+
+  for (int i = 0; i < s_len; i++) {
+    if (s[i] < 0 || s[i] > 127) {
+      errno = EINVAL;
+      return -1;
+    }
+  }
+
+  return tat__write_master(session, s, s_len);
+}
+
 bool tat_expect_string(tat_session *session, const char *s, int timeout_ms) {
   for (;;) {
     int rows, cols;

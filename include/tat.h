@@ -49,6 +49,8 @@ int tat_start_program(tat_session *session, const char *program_path,
 
 int tat_send_key(tat_session *session, unsigned char key);
 
+int tat_send_string(tat_session *session, const char *s);
+
 // Find a string in the terminal. Returns true if found within `timeout_ms`
 // else false
 bool tat_expect_string(tat_session *session, const char *s, int timeout_ms);
